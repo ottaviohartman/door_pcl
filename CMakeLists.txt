@@ -117,7 +117,8 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
-include_directories(${PCL_INCLUDE_DIRS}})
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
 
 ## Declare a C++ library
 # add_library(door_pcl
@@ -131,17 +132,19 @@ include_directories(${PCL_INCLUDE_DIRS}})
 
 ## Declare a C++ executable
 add_executable(example src/example.cpp)
-
+add_executable(region_growing src/region_growing.cpp)
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(door_pcl_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(example ${catkin_LIBRARIES})
-target_link_libraries(example ${PCL_LIBRARIES})
+target_link_libraries(example ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(region_growing ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 #############
 ## Install ##
 #############
+
 
 # all install targets should use catkin DESTINATION variables
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
