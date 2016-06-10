@@ -10,9 +10,12 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/visualization/cloud_viewer.h>
+#include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/segmentation/region_growing.h>
 #include <pcl/filters/voxel_grid.h>
+
+//#define SHOW_COLORS
 
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids) {
     // X-coord width (m)
@@ -47,7 +50,7 @@ void passthroughFilter(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::Po
     pcl::PassThrough<pcl::PointXYZ> filter;
     filter.setInputCloud(cloud);
     filter.setFilterFieldName("y");
-    filter.setFilterLimits(.3, 3.0);
+    filter.setFilterLimits(0., 3.0);
 
     filter.filter(*filtered_cloud);
 }
@@ -66,7 +69,7 @@ int main(int argc, char** argv)
 {
   // Load file
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    if (pcl::io::loadPCDFile<pcl::PointXYZ>("good3.pcd", *cloud) == -1)
+    if (pcl::io::loadPCDFile<pcl::PointXYZ>(argv[1], *cloud) == -1)
     {
         std::cout << "Cloud reading failed." << std::endl;
         return (-1);
@@ -92,7 +95,7 @@ int main(int argc, char** argv)
     pcl::RegionGrowing<pcl::PointXYZ, pcl::Normal> reg;
 
     //Maximum and minimum number of points to classify as a cluster
-    reg.setMinClusterSize(8000);
+    reg.setMinClusterSize(80);
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
@@ -128,11 +131,27 @@ int main(int argc, char** argv)
     findDoorCentroids(filtered_cloud, clusters, centroids);
 
     pcl::PointCloud <pcl::PointXYZRGB>::Ptr colored_cloud = reg.getColoredCloud ();
+
+#ifdef SHOW_COLORS  
     pcl::visualization::CloudViewer viewer ("Cluster viewer");
     viewer.showCloud(colored_cloud);
     while (!viewer.wasStopped())
     {
     }
+#else
+    pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
+    viewer.setBackgroundColor(0,0,0);
+    viewer.initCameraParameters();
+    viewer.addPointCloud<pcl::PointXYZRGB>(colored_cloud, "cloud");
+
+    for(std::vector<pcl::PointXYZ>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
+        viewer.addSphere(*it, .1);    
+    }
+    while (!viewer.wasStopped())
+    {
+        viewer.spinOnce(100);
+    }
+#endif
     return (0);
 
     // TODO: Passthrough filter, downsampling, smoothing (robotica.unileon.es)
