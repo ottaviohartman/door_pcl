@@ -15,7 +15,7 @@
 #include <pcl/segmentation/region_growing.h>
 #include <pcl/filters/voxel_grid.h>
 
-//#define SHOW_COLORS
+#define LOAD_FILE
 
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids) {
     // X-coord width (m)
@@ -26,10 +26,9 @@ void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const s
     for (std::vector<pcl::PointIndices>::const_iterator it = indices.begin(); it != indices.end(); ++it) {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>(*cloud, (*it).indices));
         // First check: to see if object is large (or takes up a large portion of the laser's view)
-        if (cluster->points.size() < 10000) {
+        if (cluster->points.size() < 4000) {
             continue;
         }
-
         // Second check: door width
         pcl::PointXYZ min;
         pcl::PointXYZ max;
@@ -67,13 +66,20 @@ void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointClou
 
 int main(int argc, char** argv)
 {
-  // Load file
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+#ifdef LOAD_FILE    
+    if (argc < 2) {
+        std::cout << "Need filename";
+        return (-1);
+    }
     if (pcl::io::loadPCDFile<pcl::PointXYZ>(argv[1], *cloud) == -1)
     {
         std::cout << "Cloud reading failed." << std::endl;
         return (-1);
     }
+#else
+
+#endif
 
     // Passthrough filter 
     pcl::PointCloud<pcl::PointXYZ>::Ptr pass_cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -123,7 +129,6 @@ int main(int argc, char** argv)
             pcl::getMinMax3D(*subset, min, max);
             std::cout << *subset << std::endl;
             std::cout << "Min: " << min << " Max: " << max << std::endl;
-            std::cout << "Width: " << (max.x - min.x) << std::endl;
         }
     }
 
@@ -132,26 +137,27 @@ int main(int argc, char** argv)
 
     pcl::PointCloud <pcl::PointXYZRGB>::Ptr colored_cloud = reg.getColoredCloud ();
 
-#ifdef SHOW_COLORS  
-    pcl::visualization::CloudViewer viewer ("Cluster viewer");
-    viewer.showCloud(colored_cloud);
-    while (!viewer.wasStopped())
-    {
-    }
-#else
-    pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
-    viewer.setBackgroundColor(0,0,0);
-    viewer.initCameraParameters();
-    viewer.addPointCloud<pcl::PointXYZRGB>(colored_cloud, "cloud");
+    if ((argc > 2) && (strcmp(argv[2], "-c") == 0)) {
+        pcl::visualization::CloudViewer viewer ("Cluster viewer");
+        viewer.showCloud(colored_cloud);
+        while (!viewer.wasStopped())
+        {
+        }
+    } else {
+        pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
+        viewer.setBackgroundColor(0,0,0);
+        viewer.initCameraParameters();
+        viewer.addPointCloud<pcl::PointXYZRGB>(colored_cloud, "cloud");
 
-    for(std::vector<pcl::PointXYZ>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
-        viewer.addSphere(*it, .1);    
+        for(std::vector<pcl::PointXYZ>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
+            viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
+        }
+        while (!viewer.wasStopped())
+        {
+            viewer.spinOnce(100);
+        }
     }
-    while (!viewer.wasStopped())
-    {
-        viewer.spinOnce(100);
-    }
-#endif
+
     return (0);
 
     // TODO: Passthrough filter, downsampling, smoothing (robotica.unileon.es)
