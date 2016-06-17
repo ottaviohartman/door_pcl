@@ -4,7 +4,7 @@
 
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids) {
     // X-coord width in meters
-    const float min_width = .89;
+    const float min_width = .88;
     const float max_width = 1.1;
 
     // Loop through clusters
@@ -36,7 +36,7 @@ void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const s
         pcl::PointXYZ max;
         pcl::getMinMax3D(*cluster, min, max);
         float door_width = max.x - min.x;
-
+        std::cout << door_width << std::endl;
         if ((door_width > min_width) && (door_width < max_width)) {
             // Return door centroid
             Eigen::Matrix<float, 4, 1> centroid;    
@@ -60,7 +60,7 @@ void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointClou
     filter.setInputCloud(cloud);
 
     // Filter size may need to be adjusted  
-    filter.setLeafSize(.01, .01, .01);
+    filter.setLeafSize(.012, .012, .012);
     std::cout << "Original size: " << cloud->points.size() << std::endl;
     filter.filter(*filtered_cloud);
     std::cout << "Reduced size: " << filtered_cloud->points.size() << std::endl;
@@ -108,14 +108,14 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimator;
     normal_estimator.setSearchMethod (tree);
     normal_estimator.setInputCloud (filtered_cloud);
-    normal_estimator.setKSearch (40);
+    normal_estimator.setKSearch (70);
     normal_estimator.compute (*normals);
 
     // Region growing
     pcl::RegionGrowing<pcl::PointXYZ, pcl::Normal> reg;
 
     //Maximum and minimum number of points to classify as a cluster
-    reg.setMinClusterSize(80);
+    reg.setMinClusterSize(120);
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
@@ -123,8 +123,8 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     reg.setNumberOfNeighbours(40);
     reg.setInputCloud(filtered_cloud);
     reg.setInputNormals(normals);
-    reg.setSmoothnessThreshold(7.0 / 180.0 * M_PI);
-    reg.setCurvatureThreshold(.3);
+    reg.setSmoothnessThreshold(5.0 / 180.0 * M_PI);
+    reg.setCurvatureThreshold(.17);
 
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
@@ -135,27 +135,29 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     findDoorCentroids(filtered_cloud, clusters, centroids);
 
     // // Show pointcloud
-    // pcl::PointCloud <pcl::PointXYZRGB>::Ptr colored_cloud = reg.getColoredCloud ();
-    // if ((argc > 2) && (strcmp(argv[2], "-c") == 0)) {
-    //     pcl::visualization::CloudViewer viewer ("Cluster viewer");
-    //     viewer.showCloud(colored_cloud);
-    //     while (!viewer.wasStopped())
-    //     {
-    //     }
-    // } else {
-    //     pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
-    //     viewer.setBackgroundColor(0,0,0);
-    //     viewer.initCameraParameters();
-    //     viewer.addPointCloud<pcl::PointXYZRGB>(colored_cloud, "cloud");
+    if (argc > 2) {
+        pcl::PointCloud <pcl::PointXYZRGB>::Ptr colored_cloud = reg.getColoredCloud ();
+        if (strcmp(argv[2], "-c") == 0) {
+            pcl::visualization::CloudViewer viewer ("Cluster viewer");
+            viewer.showCloud(colored_cloud);
+            while (!viewer.wasStopped())
+            {
+            }
+        } else {
+            pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
+            viewer.setBackgroundColor(0,0,0);
+            viewer.initCameraParameters();
+            viewer.addPointCloud<pcl::PointXYZRGB>(colored_cloud, "cloud");
 
-    //     for(std::vector<pcl::PointXYZ>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
-    //         viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
-    //     }
-    //     while (!viewer.wasStopped())
-    //     {
-    //         viewer.spinOnce(100);
-    //     }
-    // }
+            for(std::vector<pcl::PointXYZ>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
+                viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
+            }
+            while (!viewer.wasStopped())
+            {
+                viewer.spinOnce(100);
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv)

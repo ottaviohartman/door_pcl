@@ -1,0 +1,22 @@
+pcl::search::Search<pcl::PointXYZ>::Ptr tree = boost::shared_ptr<pcl::search::Search<pcl::PointXYZ> > (new pcl::search::KdTree<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal>);
+    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimator;
+    normal_estimator.setSearchMethod (tree);
+    normal_estimator.setInputCloud (filtered_cloud);
+    normal_estimator.setKSearch (70);
+    normal_estimator.compute (*normals);
+
+    // Region growing
+    pcl::RegionGrowing<pcl::PointXYZ, pcl::Normal> reg;
+
+    //Maximum and minimum number of points to classify as a cluster
+    reg.setMinClusterSize(120);
+    reg.setMaxClusterSize(1000000);
+    reg.setSearchMethod(tree);
+
+    // Number of neighbors to search -- Higher value tends to be better
+    reg.setNumberOfNeighbours(40);
+    reg.setInputCloud(filtered_cloud);
+    reg.setInputNormals(normals);
+    reg.setSmoothnessThreshold(5.0 / 180.0 * M_PI);
+    reg.setCurvatureThreshold(.17);
