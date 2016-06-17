@@ -1,40 +1,13 @@
-#include <iostream>
-#include <vector>
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <geometry_msgs/Point.h>
-#include <pcl/common/common.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/search/search.h>
-#include <pcl/search/kdtree.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/visualization/cloud_viewer.h>
-#include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/segmentation/region_growing.h>
-#include <pcl/filters/voxel_grid.h>
+#include "region_growing.h"
 
-//#define LOAD_FILE
-
-// To be moved to a .h
-void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids);
-void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids);
-void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
-void passthroughFilter(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
-void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
-
-int argc;
-char **argv;
-ros::Publisher pub;
+#define LOAD_FILE
 
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids) {
-    // X-coord width (m)
-    // TODO: create object aligned axes 
-    float min_width = .89;
-    float max_width = 1.1;
+    // X-coord width in meters
+    const float min_width = .89;
+    const float max_width = 1.1;
 
+    // Loop through clusters
     for (std::vector<pcl::PointIndices>::const_iterator it = indices.begin(); it != indices.end(); ++it) {
         // Create cluster from indices
         pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>(*cloud, (*it).indices));
@@ -44,6 +17,20 @@ void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const s
         if (cluster->points.size() < 4000) {
             continue;
         }
+
+        // Calculate OOBB
+        // pcl::MomentOfInertiaEstimation <pcl::PointXYZ> feature_extractor;
+        // feature_extractor.setInputCloud(cluster);
+        // feature_extractor.compute();
+
+        // pcl::PointXYZ min_point_OBB;
+        // pcl::PointXYZ max_point_OBB;
+        // pcl::PointXYZ position_OBB;
+        // Eigen::Matrix3f rotational_matrix_OBB;
+
+        // feature_extractor.getOBB (min_point_OBB, max_point_OBB, position_OBB, rotational_matrix_OBB);
+        // std::cout << "Minpoint: " << min_point_OBB.x << " " << min_point_OBB.y << " " << min_point_OBB << std::endl;
+
         // Second check: door width
         pcl::PointXYZ min;
         pcl::PointXYZ max;
@@ -74,9 +61,9 @@ void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointClou
 
     // Filter size may need to be adjusted  
     filter.setLeafSize(.01, .01, .01);
-    std::cout << cloud->points.size() << std::endl;
+    std::cout << "Original size: " << cloud->points.size() << std::endl;
     filter.filter(*filtered_cloud);
-    std::cout << filtered_cloud->points.size() << std::endl;
+    std::cout << "Reduced size: " << filtered_cloud->points.size() << std::endl;
 }
 
 void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
@@ -89,11 +76,21 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 
     std::vector<pcl::PointXYZ> centroids;
     processPointCloud(cloud, centroids);
-    geometry_msgs::Point point;
-    point.x = centroids[0].x;
-    point.y = centroids[0].y;
-    point.z = centroids[0].z;
-    pub.publish(point);
+    for (int i = 0;i < centroids.size();++i) {
+        geometry_msgs::PointStamped ps;
+        geometry_msgs::Point point;
+        point.x = centroids[i].x;
+        point.y = centroids[i].y;
+        point.z = centroids[i].z;
+        ps.point = point;
+
+        std_msgs::Header header;
+        header.seq = header_seq++;
+        header.frame_id = "/world";
+        header.stamp = ros::Time::now();
+        ps.header = header;
+        pub.publish(ps);
+    }
 }
 
 void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids) {
@@ -132,7 +129,7 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
 
-    std::cout << "Number of clusters is equal to " << clusters.size () << std::endl;
+    //std::cout << "Number of clusters is equal to " << clusters.size () << std::endl;
 
     // Use clusters to find door(s)
     findDoorCentroids(filtered_cloud, clusters, centroids);
@@ -173,21 +170,37 @@ int main(int argc, char** argv)
 #ifdef LOAD_FILE    
     
     if (argc < 2) {
-        std::cout << "Need filename";
+        std::cout << "ERROR: Need filename" << std::endl;
         return (-1);
     }
-    if (pcl::io::loadPCDFile<pcl::PointXYZ>(argv[1], *cloud) == -1)
-    {
+    // Run tests
+    if (strcmp(argv[1], "test") == 0) {
+        int num_tests_passed = 0;
+        for (int i = 1;i <= 14;++i) {
+            std::ostringstream stream;
+            stream << "bag_tests/" << i << ".pcd";
+            if (pcl::io::loadPCDFile<pcl::PointXYZ>(stream.str(), *cloud) == -1) {
+                std::cout << "Reading failed for bag: " << i << std::endl;
+                return (-1);
+            }   
+            std::cout << "Loading bag: " << i << ".pcd" << std::endl;
+            std::vector<pcl::PointXYZ> centroids;
+            processPointCloud(cloud, centroids);
+            num_tests_passed += (centroids.size() > 0) ? 1 : 0;     
+        }
+        std::cout << "PASSED " << num_tests_passed << " TESTS OUT OF 14" << std::endl;
+    } else if (pcl::io::loadPCDFile<pcl::PointXYZ>(argv[1], *cloud) == -1) {
         std::cout << "Cloud reading failed." << std::endl;
         return (-1);
-    }
-    std::vector<pcl::PointXYZ> centroids;
-    processPointCloud(cloud, centroids);    
+    } else {
+        std::vector<pcl::PointXYZ> centroids;
+        processPointCloud(cloud, centroids);
+    }    
 
 #else
-
+    // Run in realtime through ROS
     ros::Subscriber sub = n.subscribe("cloud", 2, cloudCB);
-    pub = n.advertise<geometry_msgs::Point>("door", 1);
+    pub = n.advertise<geometry_msgs::PointStamped>("door", 1);
 
     ros::spin();
 
