@@ -4,38 +4,25 @@
 
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids) {
     // X-coord width in meters
-    const float min_width = .88;
+    const float min_width = .87;
     const float max_width = 1.1;
 
     // Loop through clusters
     for (std::vector<pcl::PointIndices>::const_iterator it = indices.begin(); it != indices.end(); ++it) {
-        // Create cluster from indices
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>(*cloud, (*it).indices));
-
-        // TODO: more robust door checking
         // First check: to see if object is large (or takes up a large portion of the laser's view)
-        if (cluster->points.size() < 4000) {
+        if (it->indices.size() < 4000) {
             continue;
         }
+        // Create cluster from indices
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>(*cloud, (*it).indices));        
 
         // Calculate OOBB
-        // pcl::MomentOfInertiaEstimation <pcl::PointXYZ> feature_extractor;
-        // feature_extractor.setInputCloud(cluster);
-        // feature_extractor.compute();
-
-        // pcl::PointXYZ min_point_OBB;
-        // pcl::PointXYZ max_point_OBB;
-        // pcl::PointXYZ position_OBB;
-        // Eigen::Matrix3f rotational_matrix_OBB;
-
-        // feature_extractor.getOBB (min_point_OBB, max_point_OBB, position_OBB, rotational_matrix_OBB);
-        // std::cout << "Minpoint: " << min_point_OBB.x << " " << min_point_OBB.y << " " << min_point_OBB << std::endl;
 
         // Second check: door width
         pcl::PointXYZ min;
         pcl::PointXYZ max;
         pcl::getMinMax3D(*cluster, min, max);
-        float door_width = max.x - min.x;
+        float door_width = sqrt(pow(max.x-min.x, 2.) + pow(max.y-min.y, 2.));
         std::cout << door_width << std::endl;
         if ((door_width > min_width) && (door_width < max_width)) {
             // Return door centroid
@@ -60,7 +47,7 @@ void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointClou
     filter.setInputCloud(cloud);
 
     // Filter size may need to be adjusted  
-    filter.setLeafSize(.012, .012, .012);
+    filter.setLeafSize(.015, .015, .015);
     std::cout << "Original size: " << cloud->points.size() << std::endl;
     filter.filter(*filtered_cloud);
     std::cout << "Reduced size: " << filtered_cloud->points.size() << std::endl;
@@ -95,12 +82,12 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 
 void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids) {
     // Passthrough filter 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr pass_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    passthroughFilter(cloud, pass_cloud);
+    //pcl::PointCloud<pcl::PointXYZ>::Ptr pass_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    //passthroughFilter(cloud, pass_cloud);
 
     // Downsample using Voxel Grid
     pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    downsample(pass_cloud, filtered_cloud);
+    downsample(cloud, filtered_cloud);
 
     // Calculate normals
     pcl::search::Search<pcl::PointXYZ>::Ptr tree = boost::shared_ptr<pcl::search::Search<pcl::PointXYZ> > (new pcl::search::KdTree<pcl::PointXYZ>);
@@ -119,8 +106,8 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
-    // Number of neighbors to search -- Higher value tends to be better
-    reg.setNumberOfNeighbours(40);
+    // Number of neighbors to search -- 20 works well
+    reg.setNumberOfNeighbours(20);
     reg.setInputCloud(filtered_cloud);
     reg.setInputNormals(normals);
     reg.setSmoothnessThreshold(5.0 / 180.0 * M_PI);
@@ -187,6 +174,11 @@ int main(int argc, char** argv)
             }   
             std::cout << "Loading bag: " << i << ".pcd" << std::endl;
             std::vector<pcl::PointXYZ> centroids;
+
+            // Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+            // transform.rotate(Eigen::AngleAxisf(1.3, Eigen::Vector3f::UnitZ()));
+            // pcl::PointCloud<pcl::PointXYZ>::Ptr rotated_cloud (new pcl::PointCloud<pcl::PointXYZ>());
+            // pcl::transformPointCloud(*cloud, *rotated_cloud, transform);
             processPointCloud(cloud, centroids);
             num_tests_passed += (centroids.size() > 0) ? 1 : 0;     
         }
@@ -196,7 +188,11 @@ int main(int argc, char** argv)
         return (-1);
     } else {
         std::vector<pcl::PointXYZ> centroids;
-        processPointCloud(cloud, centroids);
+        // Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+        //     transform.rotate(Eigen::AngleAxisf(1.3, Eigen::Vector3f::UnitZ()));
+        //     pcl::PointCloud<pcl::PointXYZ>::Ptr rotated_cloud (new pcl::PointCloud<pcl::PointXYZ>());
+        //     pcl::transformPointCloud(*cloud, *rotated_cloud, transform);
+            processPointCloud(cloud, centroids);
     }    
 
 #else
