@@ -23,7 +23,7 @@ void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const s
         pcl::PointXYZ max;
         pcl::getMinMax3D(*cluster, min, max);
         float door_width = sqrt(pow(max.x-min.x, 2.) + pow(max.y-min.y, 2.));
-        std::cout << door_width << std::endl;
+        //std::cout << door_width << std::endl;
         if ((door_width > min_width) && (door_width < max_width)) {
             // Return door centroid
             Eigen::Matrix<float, 4, 1> centroid;    
@@ -47,8 +47,8 @@ void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointClou
     filter.setInputCloud(cloud);
 
     // Filter size may need to be adjusted  
-    filter.setLeafSize(.015, .015, .015);
-    std::cout << "Original size: " << cloud->points.size() << std::endl;
+    filter.setLeafSize(.017, .017, .017);
+    //std::cout << "Original size: " << cloud->points.size() << std::endl;
     filter.filter(*filtered_cloud);
     std::cout << "Reduced size: " << filtered_cloud->points.size() << std::endl;
 }
@@ -95,7 +95,7 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimator;
     normal_estimator.setSearchMethod (tree);
     normal_estimator.setInputCloud (filtered_cloud);
-    normal_estimator.setKSearch (70);
+    normal_estimator.setKSearch (50);
     normal_estimator.compute (*normals);
 
     // Region growing
@@ -106,12 +106,12 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
-    // Number of neighbors to search -- 20 works well
-    reg.setNumberOfNeighbours(20);
+    // Number of neighbors to search 
+    reg.setNumberOfNeighbours(25);
     reg.setInputCloud(filtered_cloud);
     reg.setInputNormals(normals);
     reg.setSmoothnessThreshold(5.0 / 180.0 * M_PI);
-    reg.setCurvatureThreshold(.17);
+    reg.setCurvatureThreshold(.37);
 
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
