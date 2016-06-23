@@ -197,7 +197,7 @@ int main(int argc, char** argv)
 
 #else
     // Run in realtime through ROS
-    ros::Subscriber sub = n.subscribe("cloud", 2, cloudCB);
+    ros::Subscriber sub = n.subscribe("cloud", 1, cloudCB);
     pub = n.advertise<geometry_msgs::PointStamped>("door", 1);
 
     ros::spin();
