@@ -9,10 +9,7 @@ void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const s
 
     // Loop through clusters
     for (std::vector<pcl::PointIndices>::const_iterator it = indices.begin(); it != indices.end(); ++it) {
-        // First check: to see if object is large (or takes up a large portion of the laser's view)
-        if (it->indices.size() < 4000) {
-            continue;
-        }
+
         // Create cluster from indices
         pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>(*cloud, (*it).indices));        
 
@@ -102,7 +99,8 @@ void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::ve
     pcl::RegionGrowing<pcl::PointXYZ, pcl::Normal> reg;
 
     //Maximum and minimum number of points to classify as a cluster
-    reg.setMinClusterSize(120);
+    // First check: to see if object is large (or takes up a large portion of the laser's view)
+    reg.setMinClusterSize(400);
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 

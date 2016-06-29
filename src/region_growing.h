@@ -17,7 +17,6 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/segmentation/region_growing.h>
 #include <pcl/filters/voxel_grid.h>
-//#include <pcl/features/moment_of_inertia_estimation.h>
 
 // To be moved to a .h
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids);

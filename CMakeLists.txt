@@ -131,14 +131,14 @@ link_directories(${PCL_LIBRARY_DIRS})
 # add_dependencies(door_pcl ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(example src/example.cpp)
+add_executable(icp src/icp.cpp)
 add_executable(region_growing src/region_growing.cpp)
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(door_pcl_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(example ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(icp ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(region_growing ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 #############
