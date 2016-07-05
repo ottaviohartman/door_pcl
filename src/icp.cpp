@@ -23,6 +23,9 @@
 #include <pcl/registration/correspondence_estimation.h>
 #include <pcl/registration/impl/correspondence_types.hpp>
 
+using pcl::visualization::PointCloudColorHandlerGenericField;
+using pcl::visualization::PointCloudColorHandlerCustom;
+
 ros::Publisher pub;
 
 int main(int argc, char** argv)
@@ -69,40 +72,27 @@ int main(int argc, char** argv)
             return (-1);
         }
         std::cout << paths[idx] << std::endl;
-
-        // pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
-        // ce.setInputSource(cloud_in);
-        // ce.setInputTarget(cloud_cumulative);
-
-        // pcl::CorrespondencesPtr corr (new pcl::Correspondences ());
-        // ce.determineReciprocalCorrespondences(*corr, .01);
-
-        // std::cerr <<  "# Correspondences = " << corr->size() << std::endl;
-
-        // for (size_t i = 0; i < corr->size(); ++i) {
-        //     std::cerr << "Corr " << corr->at(i) << std::endl;
-        // }
       
         // Passthrough
         pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud (new pcl::PointCloud<pcl::PointXYZ>);
         pcl::PassThrough<pcl::PointXYZ> filter;
         filter.setInputCloud(cloud);
         filter.setFilterFieldName("y");
-        filter.setFilterLimits(.3, 6.0);
+        filter.setFilterLimits(1., 6.0);
         filter.filter(*filtered_cloud);
             
-        for (int i = 0; i < 4; i++) {
-            Eigen::Affine3f transform(Eigen::Translation3f(0.0, 0.0, -.03*i));
-            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed (new pcl::PointCloud<pcl::PointXYZ>);
+        //for (int i = 0; i < 4; i++) {
+        //    Eigen::Affine3f transform(Eigen::Translation3f(0.0, 0.0, -.03*i));
+        //    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed (new pcl::PointCloud<pcl::PointXYZ>);
 
-            pcl::transformPointCloud (*filtered_cloud, *cloud_transformed, transform.matrix());
+        pcl::transformPointCloud(*filtered_cloud, *cloud_in, matrix_cumulative);
         
-            *cloud_in += *cloud_transformed;
-        }
+        //    *cloud_in += *cloud_transformed;
+        //}
         if (idx == 0) {
             *cloud_cumulative = *cloud_in;
             continue;
-        }
+        }   
          // ICP
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
 
@@ -110,12 +100,15 @@ int main(int argc, char** argv)
         
         // Set the max correspondence distance
         icp.setMaxCorrespondenceDistance (0.1);
-        // Set the maximum number of iterations (criterion 1)
-        icp.setMaximumIterations (1000);
+        // Set the maximum number of ite rations (criterion 1)
+        icp.setMaximumIterations (200);
         // Set the transformation epsilon (criterion 2)
-        icp.setTransformationEpsilon (1e-24);
+        icp.setTransformationEpsilon (1e-12);
         // Set the euclidean distance difference epsilon (criterion 3)
-        icp.setEuclideanFitnessEpsilon (1e-24);
+        icp.setEuclideanFitnessEpsilon (1e-14);
+
+        // icp.setRANSACOutlierRejectionThreshold(1e-6);
+        // icp.setRANSACIterations(100);
 
         // Align
         icp.setInputSource(cloud_in);
@@ -124,37 +117,53 @@ int main(int argc, char** argv)
         icp.align(*Final);
         std::cout << "has converged:" << icp.hasConverged() << " score: " << icp.getFitnessScore() << std::endl;
         std::cout << icp.getFinalTransformation() << std::endl;
-        std::cout << matrix_cumulative << std::endl;
+        
+        Eigen::Matrix4f finalT = icp.getFinalTransformation();
+        // Eigen::Affine3f transform(Eigen::Translation3f(finalT(0,3),finalT(1,3),0));
+        matrix_cumulative = matrix_cumulative * finalT;
+        // Take away vertical translation
+        //matrix_cumulative(2, 3) = 0.0;
+        
+        std::cout << "Cumulative Translation: " << 
+                    matrix_cumulative(0, 3) << ", " << 
+                    matrix_cumulative(1, 3) << std::endl;
 
         // Accumulate point cloud
         *cloud_cumulative += *Final;
+        //*cloud_in = *Final;
 
-        // Downsample
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsample (new pcl::PointCloud<pcl::PointXYZ> ());
-
-        pcl::VoxelGrid<pcl::PointXYZ> ds_filter;
-        ds_filter.setInputCloud(cloud_cumulative);
-
-        // Filter size may need to be adjusted  
-        ds_filter.setLeafSize(.015, .015, .015);
-        //std::cout << "Original size: " << cloud->points.size() << std::endl;
-        ds_filter.filter(*cloud_downsample);
-
-        //*cloud_cumulative = *cloud_downsample;
-
-        std::cout << cloud_cumulative->points.size() << std::endl;
-        if (idx == 1) {
-            break;
-        }
-        //matrix_cumulative = matrix_cumulative * icp.getFinalTransformation();
+        //std::cout << cloud_cumulative->points.size() << std::endl;
+        // if (idx == 10) {
+        //     break;
+        // }
     }
+    // Downsample
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsample (new pcl::PointCloud<pcl::PointXYZ> ());
+
+    pcl::VoxelGrid<pcl::PointXYZ> ds_filter;
+    ds_filter.setInputCloud(cloud_cumulative);
+
+    // Filter size may need to be adjusted  
+    ds_filter.setLeafSize(.03, .03, .03);
+    //std::cout << "Original size: " << cloud->points.size() << std::endl;
+    ds_filter.filter(*cloud_downsample);
+
+    *cloud_cumulative = *cloud_downsample;
 
     // Viewer
     pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
     viewer.setBackgroundColor(0,0,0);
     viewer.initCameraParameters();
+    // int vp_1, vp_2;
+    // viewer.createViewPort(0.0, 0, .5, 1.0, vp_1);
+    // viewer.createViewPort(0.5, 0, 1.0, 1.0, vp_2);
+
+    PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_cumulative_c (cloud_cumulative, 100, 255, 0);
+    PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_in_c (cloud_in, 255, 0, 0);
+
     //viewer.addPointCloud<pcl::PointXYZ>(Final, "Final");
-    viewer.addPointCloud<pcl::PointXYZ>(cloud_cumulative, "cloud");
+    viewer.addPointCloud<pcl::PointXYZ>(cloud_cumulative, cloud_cumulative_c, "cloud");
+    //viewer.addPointCloud<pcl::PointXYZ>(cloud_in, cloud_in_c, "cloud_in");
 
     while (!viewer.wasStopped()) {
         viewer.spinOnce(100);
@@ -162,6 +171,3 @@ int main(int argc, char** argv)
 
     return (0);
 }
-
-
-  
