@@ -1,6 +1,8 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <utility>
+#include <map>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>

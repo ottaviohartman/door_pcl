@@ -124,9 +124,10 @@ int main(int argc, char** argv)
         // Settings
         
         // Set the max correspondence distance
-        icp.setMaxCorrespondenceDistance(.15 + 15*(sqrt(pow(vel(0), 2.) + pow(vel(1), 2.))));
+        icp.setMaxCorrespondenceDistance(.15 + 25*(pow(vel(0), 2.) + pow(vel(1), 2.)));
+        std::cout << "Corr dist: " << .15 + 25*(pow(vel(0), 2.) + pow(vel(1), 2.)) << std::endl;
         // Set the maximum number of ite rations (criterion 1)
-        icp.setMaximumIterations(250);
+        icp.setMaximumIterations(150);
         // Set the transformation epsilon (criterion 2)
         icp.setTransformationEpsilon(1e-10);
         // Set the euclidean distance difference epsilon (criterion 3)
@@ -154,8 +155,12 @@ int main(int argc, char** argv)
         // Accumulate point cloud
         Eigen::Affine3f finalT_trans(Eigen::Translation3f(finalT(0, 3), finalT(1, 3), 0));
         
+        float yaw;
+        getYaw(yaw, finalT);
+        Eigen::AngleAxis<float> aa(yaw, Eigen::Vector3f(0, 0, 1));
+        
         // Reusing 'Final'        
-        //Eigen::Transform<float, 3, Eigen::Affine> finalT_combined = finalT_trans * aa;
+        Eigen::Transform<float, 3, Eigen::Affine> finalT_combined = finalT_trans * aa;
         //pcl::transformPointCloud(*cloud_in, *Final, finalT_combined.matrix());
 
         *cloud_cumulative += *Final;
@@ -175,14 +180,11 @@ int main(int argc, char** argv)
         }
         
         // Make a guess
-        float yaw;
-        getYaw(yaw, finalT);
-        Eigen::AngleAxis<float> aa(yaw, Eigen::Vector3f(0, 0, 1));
-        
+
         Eigen::Affine3f transform(Eigen::Translation3f(matrix_cumulative(0, 3) + vel(0), 
                                                         matrix_cumulative(1, 3) + vel(1), 0));
 
-        Eigen::Transform<float, 3, Eigen::Affine> combined = transform * aa;
+        Eigen::Transform<float, 3, Eigen::Affine> combined = transform;// * aa;
         
         matrix_cumulative = combined.matrix();
 
@@ -212,7 +214,7 @@ int main(int argc, char** argv)
     // viewer.createViewPort(0.0, 0, .5, 1.0, vp_1);
     // viewer.createViewPort(0.5, 0, 1.0, 1.0, vp_2);
     for (int i = 0; i < cumulative_clouds.size(); i++) {
-        if (cumulative_clouds[i]->points.size() < 5000) {
+        if (cumulative_clouds[i]->points.size() < 7000) {
             //continue;
         } 
         PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_c (cumulative_clouds[i], rand() % 255, rand() % 255, rand() % 255);
