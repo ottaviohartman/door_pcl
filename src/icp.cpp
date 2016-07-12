@@ -102,27 +102,18 @@ int main(int argc, char** argv)
         if (cloud->points.size() < 20) {
             continue;
         }
-            
-        // Transform estimation from last matrix
-        //cloud_t::Ptr cloud2(new cloud_t); 
 
         pcl::transformPointCloud(*cloud, *cloud_in, matrix_cumulative);
-        
-        // Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-        // transform.translate(Eigen::Vector3f(0.0, 0.0, -.1));
-        // pcl::transformPointCloud(*cloud2, *cloud_in, transform);
-
-        // *cloud_in += *cloud2;
 
         if (idx == 0) {
             *cloud_cumulative = *cloud_in;
             continue;
         }   
-         // ICP
+
+        // ICP
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
 
-        // Settings
-        
+        // Settings        
         // Set the max correspondence distance
         icp.setMaxCorrespondenceDistance(.15 + 25*(pow(vel(0), 2.) + pow(vel(1), 2.)));
         std::cout << "Corr dist: " << .15 + 25*(pow(vel(0), 2.) + pow(vel(1), 2.)) << std::endl;
@@ -133,9 +124,6 @@ int main(int argc, char** argv)
         // Set the euclidean distance difference epsilon (criterion 3)
         icp.setEuclideanFitnessEpsilon(1e-14);
 
-        // icp.setRANSACOutlierRejectionThreshold(1e-6);
-        // icp.setRANSACIterations(100000);
-
         // Align
         icp.setInputSource(cloud_in);
         icp.setInputTarget(cloud_cumulative);
@@ -144,12 +132,14 @@ int main(int argc, char** argv)
         std::cout << "has converged:" << icp.hasConverged() << " score: " << icp.getFitnessScore() << std::endl;
         std::cout << icp.getFinalTransformation() << std::endl;
         std::cout << "Velocity: " << vel(0) << ", " << vel(1) << std::endl;
+        
         if (!icp.hasConverged()) {
             vel(0) = 0;
             vel(1) = 0;
             cumulative_clouds.push_back(cloud_in);
             continue;
         }
+
         Eigen::Matrix4f finalT = icp.getFinalTransformation();
 
         // Accumulate point cloud

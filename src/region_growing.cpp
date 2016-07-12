@@ -94,9 +94,6 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 }
 
 void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroids) {
-    // Passthrough filter 
-    //cloud_t::Ptr pass_cloud(new cloud_t);
-    //passthroughFilter(cloud, pass_cloud);
 
     // Downsample using Voxel Grid
     cloud_t::Ptr filtered_cloud(new cloud_t);
@@ -129,8 +126,6 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
 
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
-
-    //std::cout << "Number of clusters is equal to " << clusters.size () << std::endl;
 
     // Use clusters to find door(s)
     findDoorCentroids(filtered_cloud, clusters, centroids);
@@ -208,26 +203,38 @@ int main(int argc, char** argv)
         std::cout << "ERROR: Need filename" << std::endl;
         return (-1);
     }
-    // Run tests
+    
     if (strcmp(argv[1], "test") == 0) {
+        
+        // Run Tests
+
         int num_tests_passed = 0;
+        
         for (int i = 1;i <= 14;++i) {
             std::ostringstream stream;
             stream << "bag_tests/" << i << ".pcd";
+        
             if (pcl::io::loadPCDFile<point_t>(stream.str(), *cloud) == -1) {
                 std::cout << "Reading failed for bag: " << i << std::endl;
                 return (-1);
             }   
+        
             std::cout << "Loading bag: " << i << ".pcd" << std::endl;
             std::vector<point_t> centroids;
+        
             processPointCloud(cloud, centroids);
+        
             num_tests_passed += (centroids.size() > 0) ? 1 : 0;     
         }
+        
         std::cout << "PASSED " << num_tests_passed << " TESTS OUT OF 14" << std::endl;
+    
     } else if (strcmp(argv[1], "test2") == 0) {
-        // Read directory
+        // Read all files in directory
+
         std::vector<boost::filesystem::path> paths;
         boost::filesystem::directory_iterator end_itr; // default construction yields past-the-end
+
         for ( boost::filesystem::directory_iterator itr("."); itr != end_itr; ++itr )
         {
             paths.push_back(itr->path());
@@ -240,30 +247,36 @@ int main(int argc, char** argv)
                 std::cout << "Reading failed for bag: " << paths[i] << std::endl;
                 return (-1);
             }
+
             std::cout << "Loading bag: " << paths[i] << std::endl;
             std::vector<point_t> centroids;
             processPointCloud(cloud, centroids);
             
             // Accumulate possible doors
             possibleDoors(centroids, possible_doors, .6);
+
         }
+        
+        std::cout << "Number of possible doors: " << possible_doors.size() << std::endl;
+        for (std::map<point_t, int>::iterator it = possible_doors.begin(); it != possible_doors.end(); it++){ 
+            point_t p = it->first;
+            std::cout << p.x << ", " << p.y << ", " << p.z << ": " << possible_doors[p] << std::endl;
+        }
+
     } else if (pcl::io::loadPCDFile<point_t>(argv[1], *cloud) == -1) {
+
         std::cout << "Cloud reading failed." << std::endl;
         return (-1);
+
     } else {
+
         std::vector<point_t> centroids;
-        // Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-        //     transform.rotate(Eigen::AngleAxisf(1.3, Eigen::Vector3f::UnitZ()));
-        //     cloud_t::Ptr rotated_cloud (new cloud_t());
-        //     pcl::transformPointCloud(*cloud, *rotated_cloud, transform);
-            processPointCloud(cloud, centroids);
+        processPointCloud(cloud, centroids);
+
     }    
-    std::cout << "Number of possible doors: " << possible_doors.size() << std::endl;
-    for (std::map<point_t, int>::iterator it = possible_doors.begin(); it != possible_doors.end(); it++){ 
-        point_t p = it->first;
-        std::cout << p.x << ", " << p.y << ", " << p.z << ": " << possible_doors[p] << std::endl;
-    }
+
 #else
+
     // Run in realtime through ROS
     ros::Subscriber sub = n.subscribe("cloud", 1, cloudCB);
     pub = n.advertise<geometry_msgs::PointStamped>("door", 1);
@@ -271,8 +284,5 @@ int main(int argc, char** argv)
     ros::spin();
 
 #endif
-
     return (0);
-
-    // TODO: smoothing (robotica.unileon.es)
 }
