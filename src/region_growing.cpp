@@ -2,21 +2,16 @@
 
 #define LOAD_FILE
 
-typedef pcl::PointXYZ point_t;
-typedef pcl::PointCloud<pcl::PointXYZ> cloud_t;
-typedef Eigen::Vector3f vec3;
-
 inline float dist(point_t a, point_t b) {
     vec3 a_(a.x, a.y, a.z);
     vec3 b_(b.x, b.y, b.z);
     return (a_ - b_).norm();
 }
 
-struct cmpPoints {
-    bool operator()(const point_t& a, const point_t& b) const {
-        return a.x < b.x;
-    }
-};
+// Comparison function to sort doorPoints
+bool cmpFreq(const doorPoint &a, const doorPoint &b) {
+    return (a.freq > b.freq);
+}
 
 void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<point_t> &centroids) {
     // X-coord width in meters
@@ -75,13 +70,20 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
     pcl::fromPCLPointCloud2(temp, *cloud);
 
     std::vector<point_t> centroids;
+
     processPointCloud(cloud, centroids);
-    for (int i = 0;i < centroids.size();++i) {
+
+    possibleDoors(centroids);
+
+    std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
+
+    for (int i = 0; i < std::min(3, (int)curr_doors.size()); ++i) {
         geometry_msgs::PointStamped ps;
         geometry_msgs::Point point;
-        point.x = centroids[i].x;
-        point.y = centroids[i].y;
-        point.z = centroids[i].z;
+        
+        point.x = curr_doors[i].center.x;
+        point.y = curr_doors[i].center.y;
+        point.z = curr_doors[i].center.z;
         ps.point = point;
 
         std_msgs::Header header;
@@ -89,7 +91,9 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
         header.frame_id = "/world";
         header.stamp = ros::Time::now();
         ps.header = header;
+        
         pub.publish(ps);
+
     }
 }
 
@@ -156,31 +160,36 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
     }
 }
 
-void possibleDoors(std::vector<point_t> &new_doors, std::map<point_t, int, cmpPoints> &curr_doors, float threshold) {
+void possibleDoors(std::vector<point_t> &new_doors, float threshold) {
     if (curr_doors.size() == 0) {
         for (int i = 0; i < new_doors.size(); i++) {
-            curr_doors.insert(std::pair<point_t, int>(new_doors[i], 1));
+            doorPoint p;
+            p.freq = 1;
+            p.center = new_doors[i];
+            curr_doors.push_back(p);
         }
     } else {
         for (int i = 0; i < new_doors.size(); i++) {
         
             bool found_match = false;
 
-            for (std::map<point_t, int>::iterator it = curr_doors.begin(); it != curr_doors.end(); ++it) {
-                point_t door = it->first;
+            for (std::vector<doorPoint>::iterator it = curr_doors.begin(); it != curr_doors.end(); ++it) {
+                point_t door = it->center;
                 float distance = dist(door, new_doors[i]);
                 std::cout << "Distance: " << distance << std::endl;
         
                 if (distance < threshold) {
-
                     // The counter in the map should be incremented
-                    curr_doors[door]++;
+                    it->freq++;
                     found_match = true;
                     break;
                 }
             }
             if (!found_match) {
-                curr_doors.insert(std::pair<point_t, int>(new_doors[i], 1));
+                doorPoint p;
+                p.freq = 1;
+                p.center = new_doors[i];
+                curr_doors.push_back(p);
             }
         }
     }
@@ -190,15 +199,17 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "door_pcl");
     ros::NodeHandle n;
+
+    // Publisher
+    pub = n.advertise<geometry_msgs::PointStamped>("door", 1);
+
     ::argc = argc;
     ::argv = argv;
-
-    std::map<point_t, int, cmpPoints> possible_doors;
 
     cloud_t::Ptr cloud(new cloud_t);
 
 #ifdef LOAD_FILE    
-    
+
     if (argc < 2) {
         std::cout << "ERROR: Need filename" << std::endl;
         return (-1);
@@ -253,14 +264,16 @@ int main(int argc, char** argv)
             processPointCloud(cloud, centroids);
             
             // Accumulate possible doors
-            possibleDoors(centroids, possible_doors, .6);
+            possibleDoors(centroids, .6);
 
         }
+        std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
+
+        std::cout << "Number of possible doors: " << curr_doors.size() << std::endl;
         
-        std::cout << "Number of possible doors: " << possible_doors.size() << std::endl;
-        for (std::map<point_t, int>::iterator it = possible_doors.begin(); it != possible_doors.end(); it++){ 
-            point_t p = it->first;
-            std::cout << p.x << ", " << p.y << ", " << p.z << ": " << possible_doors[p] << std::endl;
+        for (std::vector<doorPoint>::iterator it = curr_doors.begin(); it != curr_doors.end(); it++){ 
+            point_t p = it->center;
+            std::cout << p.x << ", " << p.y << ", " << p.z << ": " << it->freq << std::endl;
         }
 
     } else if (pcl::io::loadPCDFile<point_t>(argv[1], *cloud) == -1) {
@@ -279,7 +292,6 @@ int main(int argc, char** argv)
 
     // Run in realtime through ROS
     ros::Subscriber sub = n.subscribe("cloud", 1, cloudCB);
-    pub = n.advertise<geometry_msgs::PointStamped>("door", 1);
 
     ros::spin();
 
