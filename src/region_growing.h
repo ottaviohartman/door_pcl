@@ -33,6 +33,7 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
 void passthroughFilter(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
 void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
 void possibleDoors(std::vector<point_t> &new_doors, float threshold = 1.0);
+void publishDoor(point_t centroid);
 
 int argc;
 int header_seq=0;

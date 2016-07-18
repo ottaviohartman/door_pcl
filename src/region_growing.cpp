@@ -1,11 +1,11 @@
 #include "region_growing.h"
 
-#define LOAD_FILE
+//#define LOAD_FILE
 
 inline float dist(point_t a, point_t b) {
-    vec3 a_(a.x, a.y, a.z);
-    vec3 b_(b.x, b.y, b.z);
-    return (a_ - b_).norm();
+    vec3 a2(a.x, a.y, a.z);
+    vec3 b2(b.x, b.y, b.z);
+    return (a2 - b2).norm();
 }
 
 // Comparison function to sort doorPoints
@@ -23,8 +23,6 @@ void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIn
 
         // Create cluster from indices
         cloud_t::Ptr cluster(new cloud_t(*cloud, (*it).indices));        
-
-        // Calculate OOBB
 
         // Second check: door width
         point_t min;
@@ -77,24 +75,31 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 
     std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
 
-    for (int i = 0; i < std::min(3, (int)curr_doors.size()); ++i) {
-        geometry_msgs::PointStamped ps;
-        geometry_msgs::Point point;
-        
-        point.x = curr_doors[i].center.x;
-        point.y = curr_doors[i].center.y;
-        point.z = curr_doors[i].center.z;
-        ps.point = point;
+    //for (int i = 0; i < std::min(3, (int)curr_doors.size()); ++i) {
+		
+		std::cout << "Publishing " << curr_doors[0].center.x << ". With freq " << curr_doors[0].freq << std::endl;
+	   
+    	publishDoor(curr_doors[0].center);
+    //}
+}
 
-        std_msgs::Header header;
-        header.seq = header_seq++;
-        header.frame_id = "/world";
-        header.stamp = ros::Time::now();
-        ps.header = header;
-        
-        pub.publish(ps);
+void publishDoor(point_t centroid) {
 
-    }
+    geometry_msgs::PointStamped ps;
+    geometry_msgs::Point point;
+    
+    point.x = centroid.x;
+    point.y = centroid.y;
+    point.z = centroid.z;
+    ps.point = point;
+
+    std_msgs::Header header;
+    header.seq = header_seq++;
+    header.frame_id = "/world";
+    header.stamp = ros::Time::now();
+    ps.header = header;
+    
+    pub.publish(ps);
 }
 
 void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroids) {
@@ -117,7 +122,7 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
 
     //Maximum and minimum number of points to classify as a cluster
     // First check: to see if object is large (or takes up a large portion of the laser's view)
-    reg.setMinClusterSize(100);
+    reg.setMinClusterSize(80);
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
@@ -132,6 +137,7 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
     reg.extract(clusters);
 
     // Use clusters to find door(s)
+    std::cout << "Finding doors" << std::endl;
     findDoorCentroids(filtered_cloud, clusters, centroids);
 
     // // Show pointcloud
@@ -176,7 +182,7 @@ void possibleDoors(std::vector<point_t> &new_doors, float threshold) {
             for (std::vector<doorPoint>::iterator it = curr_doors.begin(); it != curr_doors.end(); ++it) {
                 point_t door = it->center;
                 float distance = dist(door, new_doors[i]);
-                std::cout << "Distance: " << distance << std::endl;
+                //std::cout << "Distance: " << distance << std::endl;
         
                 if (distance < threshold) {
                     // The counter in the map should be incremented
@@ -215,36 +221,11 @@ int main(int argc, char** argv)
         return (-1);
     }
     
-    if (strcmp(argv[1], "test") == 0) {
-        
-        // Run Tests
-
-        int num_tests_passed = 0;
-        
-        for (int i = 1;i <= 14;++i) {
-            std::ostringstream stream;
-            stream << "bag_tests/" << i << ".pcd";
-        
-            if (pcl::io::loadPCDFile<point_t>(stream.str(), *cloud) == -1) {
-                std::cout << "Reading failed for bag: " << i << std::endl;
-                return (-1);
-            }   
-        
-            std::cout << "Loading bag: " << i << ".pcd" << std::endl;
-            std::vector<point_t> centroids;
-        
-            processPointCloud(cloud, centroids);
-        
-            num_tests_passed += (centroids.size() > 0) ? 1 : 0;     
-        }
-        
-        std::cout << "PASSED " << num_tests_passed << " TESTS OUT OF 14" << std::endl;
-    
-    } else if (strcmp(argv[1], "test2") == 0) {
+	if (strcmp(argv[1], "test") == 0) {
         // Read all files in directory
 
         std::vector<boost::filesystem::path> paths;
-        boost::filesystem::directory_iterator end_itr; // default construction yields past-the-end
+        boost::filesystem::directory_iterator end_itr; 
 
         for ( boost::filesystem::directory_iterator itr("."); itr != end_itr; ++itr )
         {
@@ -252,6 +233,8 @@ int main(int argc, char** argv)
         }
         
         std::sort(paths.begin(), paths.end());
+
+		ros::Rate r(2.);
 
         for (int i=0; i < paths.size(); i++) {
             if (pcl::io::loadPCDFile<point_t>(paths[i].string(), *cloud) == -1) {
@@ -264,16 +247,36 @@ int main(int argc, char** argv)
             processPointCloud(cloud, centroids);
             
             // Accumulate possible doors
-            possibleDoors(centroids, .6);
+            possibleDoors(centroids, 1.);
 
+	        std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
+	        if (curr_doors.size() > 0) {
+	        	
+	        	int i=0;
+	        	
+	        	// Very preliminary filter
+	        	while(i < curr_doors.size()) {
+	        		if (curr_doors[i].center.y < 0) {
+	        			i++;
+	        		} else {
+	        			break;
+	        		}
+	        	}
+	        	std::cout << "Publishing " << curr_doors[i].center.x << ". With freq " << curr_doors[i].freq << std::endl;
+	        	publishDoor(curr_doors[i].center);
+	        }
+
+	        r.sleep();
         }
-        std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
 
         std::cout << "Number of possible doors: " << curr_doors.size() << std::endl;
+		std::cout << "Printing doors with Y > 0" << std::endl;
         
         for (std::vector<doorPoint>::iterator it = curr_doors.begin(); it != curr_doors.end(); it++){ 
             point_t p = it->center;
-            std::cout << p.x << ", " << p.y << ", " << p.z << ": " << it->freq << std::endl;
+            if (p.y > 0) {
+            	std::cout << p.x << ", " << p.y << ", " << p.z << ": " << it->freq << std::endl;
+            }
         }
 
     } else if (pcl::io::loadPCDFile<point_t>(argv[1], *cloud) == -1) {
