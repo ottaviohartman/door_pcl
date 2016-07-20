@@ -1,22 +1,25 @@
 #include "region_growing.h"
 
-//#define LOAD_FILE
+#define LOAD_FILE
 
-inline float dist(point_t a, point_t b) {
+inline float dist(point_t a, point_t b) 
+{
     vec3 a2(a.x, a.y, a.z);
     vec3 b2(b.x, b.y, b.z);
     return (a2 - b2).norm();
 }
 
 // Comparison function to sort doorPoints
-bool cmpFreq(const doorPoint &a, const doorPoint &b) {
+bool cmpFreq(const doorPoint &a, const doorPoint &b) 
+{
     return (a.freq > b.freq);
 }
 
-void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<point_t> &centroids) {
+void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<point_t> &centroids) 
+{
     // X-coord width in meters
-    const float min_width = .87;
-    const float max_width = 1.1;
+    const float min_width = .8;
+    const float max_width = .96;
 
     // Loop through clusters
     for (std::vector<pcl::PointIndices>::const_iterator it = indices.begin(); it != indices.end(); ++it) {
@@ -40,7 +43,8 @@ void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIn
     }
 }
 
-void passthroughFilter(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) {
+void passthroughFilter(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) 
+{
     pcl::PassThrough<point_t> filter;
     filter.setInputCloud(cloud);
     filter.setFilterFieldName("y");
@@ -48,7 +52,8 @@ void passthroughFilter(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) 
     filter.filter(*filtered_cloud);
 }
 
-void downsample(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) {
+void downsample(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) 
+{
     pcl::VoxelGrid<point_t> filter;
     filter.setInputCloud(cloud);
 
@@ -59,7 +64,8 @@ void downsample(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) {
     std::cout << "Reduced size: " << filtered_cloud->points.size() << std::endl;
 }
 
-void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
+void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) 
+{
     pcl::PCLPointCloud2 temp;
 
     // Convert to PCL data type
@@ -71,19 +77,28 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
 
     processPointCloud(cloud, centroids);
 
-    possibleDoors(centroids);
+    possibleDoors(centroids, .45);
 
     std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
 
     //for (int i = 0; i < std::min(3, (int)curr_doors.size()); ++i) {
-		
-		std::cout << "Publishing " << curr_doors[0].center.x << ". With freq " << curr_doors[0].freq << std::endl;
-	   
-    	publishDoor(curr_doors[0].center);
-    //}
+    int i = 0;
+	while (i < curr_doors.size()) {
+        if (curr_doors[i].center.z < 0) {
+            i++;
+        } else {
+            std::cout << "Publishing " << curr_doors[i].center.x << 
+            ", " << curr_doors[i].center.y << ", " << 
+            curr_doors[i].center.z << ". With freq " << curr_doors[i].freq << std::endl;
+    	   
+        	publishDoor(curr_doors[i].center);
+            break;
+        }
+    }
 }
 
-void publishDoor(point_t centroid) {
+void publishDoor(point_t centroid) 
+{
 
     geometry_msgs::PointStamped ps;
     geometry_msgs::Point point;
@@ -102,7 +117,8 @@ void publishDoor(point_t centroid) {
     pub.publish(ps);
 }
 
-void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroids) {
+void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroids) 
+{
 
     // Downsample using Voxel Grid
     cloud_t::Ptr filtered_cloud(new cloud_t);
@@ -122,22 +138,21 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
 
     //Maximum and minimum number of points to classify as a cluster
     // First check: to see if object is large (or takes up a large portion of the laser's view)
-    reg.setMinClusterSize(80);
+    reg.setMinClusterSize(120);
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
     // Number of neighbors to search 
-    reg.setNumberOfNeighbours(25);
+    reg.setNumberOfNeighbours(20);
     reg.setInputCloud(filtered_cloud);
     reg.setInputNormals(normals);
     reg.setSmoothnessThreshold(6.0 / 180.0 * M_PI);
-    reg.setCurvatureThreshold(.1);
+    reg.setCurvatureThreshold(.2);
 
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
 
     // Use clusters to find door(s)
-    std::cout << "Finding doors" << std::endl;
     findDoorCentroids(filtered_cloud, clusters, centroids);
 
     // // Show pointcloud
@@ -149,7 +164,7 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
             while (!viewer.wasStopped())
             {
             }
-        } else {
+        } else if (strcmp(argv[2], "-d") == 0) {
             pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
             viewer.setBackgroundColor(0,0,0);
             viewer.initCameraParameters();
@@ -166,7 +181,9 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
     }
 }
 
-void possibleDoors(std::vector<point_t> &new_doors, float threshold) {
+void possibleDoors(std::vector<point_t> &new_doors, float threshold) 
+{
+    std::cout << "Found " << new_doors.size() << " new doors." << std::endl;
     if (curr_doors.size() == 0) {
         for (int i = 0; i < new_doors.size(); i++) {
             doorPoint p;
@@ -247,7 +264,7 @@ int main(int argc, char** argv)
             processPointCloud(cloud, centroids);
             
             // Accumulate possible doors
-            possibleDoors(centroids, 1.);
+            possibleDoors(centroids, .35);
 
 	        std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
 	        if (curr_doors.size() > 0) {
@@ -256,14 +273,16 @@ int main(int argc, char** argv)
 	        	
 	        	// Very preliminary filter
 	        	while(i < curr_doors.size()) {
-	        		if (curr_doors[i].center.y < 0) {
+	        		if (curr_doors[i].center.z < 0) {
 	        			i++;
 	        		} else {
-	        			break;
+                        std::cout << "Publishing " << curr_doors[i].center.x << 
+                        ", " << curr_doors[i].center.y << ", " << 
+                        curr_doors[i].center.z << ". With freq " << curr_doors[i].freq << std::endl;
+                        publishDoor(curr_doors[i].center);
+                        break;
 	        		}
 	        	}
-	        	std::cout << "Publishing " << curr_doors[i].center.x << ". With freq " << curr_doors[i].freq << std::endl;
-	        	publishDoor(curr_doors[i].center);
 	        }
 
 	        r.sleep();
