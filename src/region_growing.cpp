@@ -43,15 +43,6 @@ void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIn
     }
 }
 
-void passthroughFilter(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) 
-{
-    pcl::PassThrough<point_t> filter;
-    filter.setInputCloud(cloud);
-    filter.setFilterFieldName("y");
-    filter.setFilterLimits(0., 3.0);
-    filter.filter(*filtered_cloud);
-}
-
 void downsample(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud) 
 {
     pcl::VoxelGrid<point_t> filter;
@@ -77,7 +68,10 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
     processPointCloud(cloud, centroids);
 
-    possibleDoors(centroids, .45);
+    if (centroids.size() > 0) {
+        publishDoor(centroids[0]);
+    }
+    /*possibleDoors(centroids, .45);
 
     std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
 
@@ -94,7 +88,7 @@ void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
         	publishDoor(curr_doors[i].center);
             break;
         }
-    }
+    }*/
 }
 
 void publishDoor(point_t centroid) 
@@ -152,33 +146,11 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
 
+    // Update colored cloud
+    colored_cloud = reg.getColoredCloud();
+
     // Use clusters to find door(s)
     findDoorCentroids(filtered_cloud, clusters, centroids);
-
-    // // Show pointcloud
-    if (argc > 2) {
-        pcl::PointCloud <pcl::PointXYZRGB>::Ptr colored_cloud = reg.getColoredCloud ();
-        if (strcmp(argv[2], "-c") == 0) {
-            pcl::visualization::CloudViewer viewer ("Cluster viewer");
-            viewer.showCloud(colored_cloud);
-            while (!viewer.wasStopped())
-            {
-            }
-        } else if (strcmp(argv[2], "-d") == 0) {
-            pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
-            viewer.setBackgroundColor(0,0,0);
-            viewer.initCameraParameters();
-            viewer.addPointCloud<pcl::PointXYZRGB>(colored_cloud, "cloud");
-
-            for(std::vector<point_t>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
-                viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
-            }
-            while (!viewer.wasStopped())
-            {
-                viewer.spinOnce(100);
-            }
-        }
-    }
 }
 
 void possibleDoors(std::vector<point_t> &new_doors, float threshold) 
@@ -218,6 +190,29 @@ void possibleDoors(std::vector<point_t> &new_doors, float threshold)
     }
 }
 
+void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids) {
+    if (strcmp(argv[2], "-c") == 0) {
+        pcl::visualization::CloudViewer viewer ("Cluster viewer");
+        viewer.showCloud(cloud);
+        while (!viewer.wasStopped())
+        {
+        }
+    } else if (strcmp(argv[2], "-d") == 0) {
+        pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
+        viewer.setBackgroundColor(0,0,0);
+        viewer.initCameraParameters();
+        viewer.addPointCloud<pcl::PointXYZRGB>(cloud, "cloud");
+
+        for(std::vector<point_t>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
+            viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
+        }
+        while (!viewer.wasStopped())
+        {
+            viewer.spinOnce(100);
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "door_pcl");
@@ -231,14 +226,15 @@ int main(int argc, char** argv)
 
     cloud_t::Ptr cloud(new cloud_t);
 
-#ifdef LOAD_FILE    
-
     if (argc < 2) {
-        std::cout << "ERROR: Need filename" << std::endl;
-        return (-1);
-    }
-    
-	if (strcmp(argv[1], "test") == 0) {
+        std::cout << "Now subscribing to ROS topics" << std::endl;
+        // Run in realtime through ROS
+        ros::Subscriber sub = n.subscribe("cloud", 1, cloudCB);
+
+        ros::spin();
+
+        return (0);
+    } else if (strcmp(argv[1], "test") == 0) {
         // Read all files in directory
 
         std::vector<boost::filesystem::path> paths;
@@ -263,8 +259,14 @@ int main(int argc, char** argv)
             std::vector<point_t> centroids;
             processPointCloud(cloud, centroids);
             
+            if (centroids.size() > 0) {
+                if (centroids[0].z > 0) {
+                    publishDoor(centroids[0]);
+                }
+            }
+            
             // Accumulate possible doors
-            possibleDoors(centroids, .35);
+            /*possibleDoors(centroids, .35);
 
 	        std::sort(curr_doors.begin(), curr_doors.end(), cmpFreq);
 	        if (curr_doors.size() > 0) {
@@ -283,7 +285,7 @@ int main(int argc, char** argv)
                         break;
 	        		}
 	        	}
-	        }
+	        }*/
 
 	        r.sleep();
         }
@@ -298,25 +300,19 @@ int main(int argc, char** argv)
             }
         }
 
-    } else if (pcl::io::loadPCDFile<point_t>(argv[1], *cloud) == -1) {
-
-        std::cout << "Cloud reading failed." << std::endl;
-        return (-1);
-
     } else {
+        if (pcl::io::loadPCDFile<point_t>(argv[1], *cloud) == -1) {
+            std::cout << "Cloud reading failed." << std::endl;
+            return (-1);
+        }
 
         std::vector<point_t> centroids;
         processPointCloud(cloud, centroids);
-
+        
+        // Show pointcloud
+        if (argc > 2) {
+            showPointCLoud(colored_cloud, centroids);
+        }
     }    
-
-#else
-
-    // Run in realtime through ROS
-    ros::Subscriber sub = n.subscribe("cloud", 1, cloudCB);
-
-    ros::spin();
-
-#endif
     return (0);
 }

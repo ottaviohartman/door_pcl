@@ -5,7 +5,7 @@ from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu
 
 tfRot = 0
-ser = serial.Serial('/dev/ttyUSB0', baudrate=115200)
+#ser = serial.Serial('/dev/ttyUSB0', baudrate=115200)
 
 def doorCallback(data):
 	rospy.loginfo("Door is at point: %f, %f. Height: %f", data.point.x, data.point.y, data.point.z)
@@ -55,7 +55,7 @@ def initListener():
 
 def sendCmd(bound, speedDes, yawDes):
   cmd = bytearray(struct.pack('<BBff',123,bound,speedDes,yawDes))
-  ser.write(cmd)
+  #ser.write(cmd)
 
 if __name__ == '__main__':
 
