@@ -1,7 +1,5 @@
 #include "region_growing.h"
 
-#define LOAD_FILE
-
 inline float dist(point_t a, point_t b) 
 {
     vec3 a2(a.x, a.y, a.z);
