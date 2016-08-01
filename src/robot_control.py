@@ -3,9 +3,11 @@
 import serial, time, struct, rospy, math, tf
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import Imu
+from rositaur.msg import Command
+
+pub = rospy.Publisher('/command', Command, queue_size=100)
 
 tfRot = 0
-#ser = serial.Serial('/dev/ttyUSB0', baudrate=115200)
 
 def doorCallback(data):
 	rospy.loginfo("Door is at point: %f, %f. Height: %f", data.point.x, data.point.y, data.point.z)
