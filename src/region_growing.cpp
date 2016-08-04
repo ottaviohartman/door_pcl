@@ -7,7 +7,9 @@ inline float dist(point_t a, point_t b)
     return (a2 - b2).norm();
 }
 
+
 // Comparison function to sort doorPoints 
+
 bool cmpFreq(const doorPoint &a, const doorPoint &b) 
 {
     return (a.freq > b.freq);
@@ -28,7 +30,7 @@ void downsample(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud)
 void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) 
 {
 	//*prev = *cloud_msg;   
-	 
+
     pcl::PCLPointCloud2 temp;
 
     // Convert to PCL data type
@@ -64,7 +66,6 @@ void publishDoor(point_t centroid)
     
     pub.publish(ps);
 }
-
 
 void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<point_t> &centroids) 
 {
@@ -161,6 +162,29 @@ void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::ve
     }
 }
 
+void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids) {
+    if (strcmp(argv[2], "-c") == 0) {
+        pcl::visualization::CloudViewer viewer ("Cluster viewer");
+        viewer.showCloud(cloud);
+        while (!viewer.wasStopped())
+        {
+        }
+    } else if (strcmp(argv[2], "-d") == 0) {
+        pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
+        viewer.setBackgroundColor(0,0,0);
+        viewer.initCameraParameters();
+        viewer.addPointCloud<pcl::PointXYZRGB>(cloud, "cloud");
+
+        for(std::vector<point_t>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
+            viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
+        }
+        while (!viewer.wasStopped())
+        {
+            viewer.spinOnce(100);
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "door_pcl");
@@ -215,6 +239,7 @@ int main(int argc, char** argv)
                     publishDoor(centroids[0]);
                 }
             }
+
 	        r.sleep();
         }
 

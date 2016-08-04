@@ -17,7 +17,7 @@ def doorCallback(data):
 	rospy.loginfo("Door is at point: %f, %f. Height: %f", data.point.x, data.point.y, data.point.z)
 	
 	rot = math.atan2(data.point.y, data.point.x)
-
+	
 	rotDes = rot / 2.
 
 	rospy.loginfo("Turning. rot: %f", rotDes)
