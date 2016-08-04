@@ -131,14 +131,16 @@ link_directories(${PCL_LIBRARY_DIRS})
 # add_dependencies(door_pcl ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(icp src/icp.cpp)
 add_executable(region_growing src/region_growing.cpp)
+add_executable(point_repeater src/point_repeater.cpp)
+
+
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(door_pcl_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(icp ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(point_repeater ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(region_growing ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 #############
@@ -157,7 +159,7 @@ install(PROGRAMS
 )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS icp region_growing
+install(TARGETS point_repeater region_growing
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -171,11 +173,11 @@ install(TARGETS icp region_growing
 # )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
-#install(FILES
-  
-  # myfile2
-  #DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-#)
+install(FILES
+  launch/start.launch
+  launch/bag_start.launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
 
 #############
 ## Testing ##

@@ -4,6 +4,7 @@
 #include <utility>
 #include <algorithm>
 #include <ros/ros.h>
+#include <ros/callback_queue.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>
 #include <pcl/common/common.h>
@@ -30,15 +31,16 @@ typedef Eigen::Vector3f vec3;
 void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids);
 void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids);
 void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
-void passthroughFilter(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
+void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids);
 void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
-void possibleDoors(std::vector<point_t> &new_doors, float threshold = 1.0);
 void publishDoor(point_t centroid);
 
 int argc;
 int header_seq=0;
 char **argv;
 ros::Publisher pub;
+
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud;
 
 struct doorPoint {
     int freq;

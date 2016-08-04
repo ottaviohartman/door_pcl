@@ -1,0 +1,14 @@
+<launch>
+    <param name="/use_sim_time" value="true"/>
+    
+    <include file="$(find tilt_laser)/bag_start.launch" />
+        
+    <node pkg="door_pcl" type="region_growing" name="region_growing" output="screen"/>
+    
+    <node pkg="door_pcl" type="robot_control.py" name="robot_controls" output="screen" />
+    
+    <node pkg="door_pcl" type="point_repeater" name="point_repeater" />
+
+</launch>
+
+

@@ -1,0 +1,17 @@
+<launch>
+    <arg name="port" />
+
+    <param name="/use_sim_time" value="false"/>
+    
+    <include file="$(find tilt_laser)/start.launch" pass_all_args="true" />
+    
+    <node pkg="rositaur" type="serial_pub" name="serial_publisher" />
+    
+    <node pkg="door_pcl" type="region_growing" name="region_growing" />
+    
+    <node pkg="door_pcl" type="robot_control.py" name="robot_control" />
+    
+    <node pkg="door_pcl" type="point_repeater" name="point_repeater" />
+
+</launch>
+
