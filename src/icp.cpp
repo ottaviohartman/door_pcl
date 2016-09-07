@@ -200,22 +200,22 @@ int main(int argc, char** argv)
     pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
     viewer.setBackgroundColor(0,0,0);
     viewer.initCameraParameters();
-    // int vp_1, vp_2;
-    // viewer.createViewPort(0.0, 0, .5, 1.0, vp_1);
-    // viewer.createViewPort(0.5, 0, 1.0, 1.0, vp_2);
-    for (int i = 0; i < cumulative_clouds.size(); i++) {
-        if (cumulative_clouds[i]->points.size() < 7000) {
-            //continue;
-        } 
-        PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_c (cumulative_clouds[i], rand() % 255, rand() % 255, rand() % 255);
-        viewer.addPointCloud<pcl::PointXYZ>(cumulative_clouds[i], cloud_c, "cloud" + boost::lexical_cast<std::string>(i));       
-    }
-    // PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_cumulative_c (cloud_cumulative, 100, 255, 0);
-    // PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_in_c (cumulative_clouds[0], 255, 0, 0);
+    int vp_1, vp_2;
+    viewer.createViewPort(0.0, 0, .5, 1.0, vp_1);
+    viewer.createViewPort(0.5, 0, 1.0, 1.0, vp_2);
+    // for (int i = 0; i < cumulative_clouds.size(); i++) {
+    //     if (cumulative_clouds[i]->points.size() < 7000) {
+    //         //continue;
+    //     } 
+    //     PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_c (cumulative_clouds[i], rand() % 255, rand() % 255, rand() % 255);
+    //     viewer.addPointCloud<pcl::PointXYZ>(cumulative_clouds[i], cloud_c, "cloud" + boost::lexical_cast<std::string>(i));       
+    // }
+    PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_cumulative_c (cloud_no_icp, 100, 255, 0);
+    PointCloudColorHandlerCustom<pcl::PointXYZ> cloud_in_c (cumulative_clouds[0], 255, 0, 0);
 
     //viewer.addPointCloud<pcl::PointXYZ>(Final, "Final");
-    // viewer.addPointCloud<pcl::PointXYZ>(cloud_cumulative, cloud_cumulative_c, "cloud");
-    // viewer.addPointCloud<pcl::PointXYZ>(cumulative_clouds[0], cloud_in_c, "cloud_in");
+    viewer.addPointCloud<pcl::PointXYZ>(cloud_no_icp, cloud_cumulative_c, "cloud", vp_1);
+    viewer.addPointCloud<pcl::PointXYZ>(cumulative_clouds[0], cloud_in_c, "cloud_in", vp_2);
     std::cout << "Collected " << cumulative_clouds.size() << " clouds." << std::endl;
     while (!viewer.wasStopped()) {
         viewer.spinOnce(100);

@@ -133,7 +133,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 ## Declare a C++ executable
 add_executable(region_growing src/region_growing.cpp)
 add_executable(point_repeater src/point_repeater.cpp)
-
+add_executable(icp src/icp.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
@@ -142,6 +142,7 @@ add_executable(point_repeater src/point_repeater.cpp)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(point_repeater ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(region_growing ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(icp ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 #############
 ## Install ##

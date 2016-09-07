@@ -21,23 +21,19 @@
 #include <pcl/segmentation/region_growing.h>
 #include <pcl/filters/voxel_grid.h>
 
-
 typedef pcl::PointXYZ point_t;
 typedef pcl::PointCloud<pcl::PointXYZ> cloud_t;
 typedef Eigen::Vector3f vec3;
 
-
-// To be moved to a .h
-void findDoorCentroids(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids);
-void processPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids);
+void findDoorCentroids(const cloud_t::Ptr &cloud, const std::vector<pcl::PointIndices> &indices, std::vector<pcl::PointXYZ> &centroids);
+void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroids);
 void cloudCB(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
-void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids);
-void downsample(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr &filtered_cloud);
+void showPointCloudColor(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud);
+void showPointCloudSphere(const cloud_t &cloud, std::vector<point_t> &centroids);
+void downsample(const cloud_t::Ptr &cloud, cloud_t::Ptr &filtered_cloud);
 void publishDoor(point_t centroid);
 
-int argc;
-int header_seq=0;
-char **argv;
+int header_seq = 0;
 ros::Publisher pub;
 
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud;

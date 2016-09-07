@@ -110,7 +110,7 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
     pcl::NormalEstimation<point_t, pcl::Normal> normal_estimator;
     normal_estimator.setSearchMethod (tree);
     normal_estimator.setInputCloud (filtered_cloud);
-    normal_estimator.setKSearch (40);
+    normal_estimator.setKSearch (20);
     normal_estimator.compute (*normals);
 
     // Region growing
@@ -118,16 +118,16 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
 
     //Maximum and minimum number of points to classify as a cluster
     // First check: to see if object is large (or takes up a large portion of the laser's view)
-    reg.setMinClusterSize(120);
+    reg.setMinClusterSize(40);
     reg.setMaxClusterSize(1000000);
     reg.setSearchMethod(tree);
 
     // Number of neighbors to search 
-    reg.setNumberOfNeighbours(20);
+    reg.setNumberOfNeighbours(35);
     reg.setInputCloud(filtered_cloud);
     reg.setInputNormals(normals);
     reg.setSmoothnessThreshold(6.0 / 180.0 * M_PI);
-    reg.setCurvatureThreshold(.2);
+    reg.setCurvatureThreshold(.15);
 
     std::vector<pcl::PointIndices> clusters;
     reg.extract(clusters);
@@ -139,50 +139,30 @@ void processPointCloud(const cloud_t::Ptr &cloud, std::vector<point_t> &centroid
     findDoorCentroids(filtered_cloud, clusters, centroids);
 }
 
-void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids) {
-    if (strcmp(argv[2], "-c") == 0) {
-        pcl::visualization::CloudViewer viewer ("Cluster viewer");
-        viewer.showCloud(cloud);
-        while (!viewer.wasStopped())
-        {
-        }
-    } else if (strcmp(argv[2], "-d") == 0) {
-        pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
-        viewer.setBackgroundColor(0,0,0);
-        viewer.initCameraParameters();
-        viewer.addPointCloud<pcl::PointXYZRGB>(cloud, "cloud");
-
-        for(std::vector<point_t>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
-            viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
-        }
-        while (!viewer.wasStopped())
-        {
-            viewer.spinOnce(100);
-        }
+void showPointCloudColor(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud) 
+{
+    pcl::visualization::CloudViewer viewer ("Cluster viewer");
+    viewer.showCloud(cloud);
+    while (!viewer.wasStopped())
+    {
     }
 }
 
-void showPointCLoud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids) {
-    if (strcmp(argv[2], "-c") == 0) {
-        pcl::visualization::CloudViewer viewer ("Cluster viewer");
-        viewer.showCloud(cloud);
-        while (!viewer.wasStopped())
-        {
-        }
-    } else if (strcmp(argv[2], "-d") == 0) {
-        pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
-        viewer.setBackgroundColor(0,0,0);
-        viewer.initCameraParameters();
-        viewer.addPointCloud<pcl::PointXYZRGB>(cloud, "cloud");
+void showPointCloudSphere(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud, std::vector<pcl::PointXYZ> &centroids)
+{
+    pcl::visualization::PCLVisualizer viewer ("Cluster viewer");
+    viewer.setBackgroundColor(0,0,0);
+    viewer.initCameraParameters();
+    viewer.addPointCloud<pcl::PointXYZRGB>(cloud, "cloud");
 
-        for(std::vector<point_t>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
-            viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
-        }
-        while (!viewer.wasStopped())
-        {
-            viewer.spinOnce(100);
-        }
+    for(std::vector<point_t>::iterator it = centroids.begin(); it != centroids.end(); ++it) {
+        viewer.addSphere(*it, .1, "Sphere" + (it - centroids.begin()));    
     }
+    while (!viewer.wasStopped())
+    {
+        viewer.spinOnce(100);
+    }
+
 }
 
 int main(int argc, char** argv)
@@ -192,9 +172,6 @@ int main(int argc, char** argv)
 
     // Publisher
     pub = n.advertise<geometry_msgs::PointStamped>("door2", 1);
-
-    ::argc = argc;
-    ::argv = argv;
 
     cloud_t::Ptr cloud(new cloud_t);
 
@@ -254,17 +231,23 @@ int main(int argc, char** argv)
         }
 
     } else {
+
         if (pcl::io::loadPCDFile<point_t>(argv[1], *cloud) == -1) {
             std::cout << "Cloud reading failed." << std::endl;
             return (-1);
         }
 
         std::vector<point_t> centroids;
+        
         processPointCloud(cloud, centroids);
         
         // Show pointcloud
         if (argc > 2) {
-            showPointCLoud(colored_cloud, centroids);
+            if (strcmp(argv[2], "-c") == 0) {
+                showPointCloudColor(colored_cloud);
+            } else if (strcmp(argv[2], "-d") == 0) {
+                showPointCloudSphere(colored_cloud, centroids);
+            }
         }
     }    
     return (0);
